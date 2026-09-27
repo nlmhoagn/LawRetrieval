@@ -1,4 +1,10 @@
-# DSC 2026 — Task 1: Legal Information Retrieval
+# DSC 2026 — Vietnamese Legal AI System
+
+Comprehensive AI solution for the **DSC 2026 (UIT Data Science Challenge)**, covering both **Task 1 (Legal Information Retrieval)** and **Task 2 (Legal Question Answering)**.
+
+---
+
+# Task 1: Legal Information Retrieval (LegalIR)
 
 Vietnamese Legal Document Retrieval System. Given a query, return the **top 5 documents** most likely to contain the answer.
 
@@ -6,7 +12,7 @@ Vietnamese Legal Document Retrieval System. Given a query, return the **top 5 do
 
 ---
 
-## Quick Start
+## Quick Start (Task 1)
 
 ```bash
 pip install -r requirements.txt
@@ -49,7 +55,7 @@ python run_all.py --data "..." --force                        # re-run from scra
 
 ---
 
-## Pipeline
+## Pipeline (Task 1)
 
 ```
 8,532 legal documents (353M characters, median 4,813 words/doc)
@@ -154,7 +160,7 @@ Labels are at the document level, whereas scoring occurs at the chunk level:
 
 ---
 
-## Project Structure
+## Project Structure (Task 1)
 
 ```
 run_all.py                          runs end-to-end pipeline
@@ -203,7 +209,7 @@ The most critical issue caught is **E010**: `context_*.json` stores `id` as inte
 
 ---
 
-## Data Insights & Findings
+## Data Insights & Findings (Task 1)
 
 | Insight | Metric | Implication |
 |---|---|---|
@@ -235,7 +241,7 @@ Requires `sentencepiece` and `protobuf` (see `requirements.txt`).
 
 ---
 
-## Empirical Insights & Evaluation Lessons
+## Empirical Insights & Evaluation Lessons (Task 1)
 
 On sample sizes of 200–500 queries, **score differences under ~0.01 are purely noise**. We narrowly avoided three suboptimal parameter choices caused by trusting single-run grid search peaks:
 
@@ -247,9 +253,102 @@ Finalized evaluation protocol: grid sweep on one sample split → **validate on 
 
 ---
 
-## Next Steps / Future Work
+## Next Steps / Future Work (Task 1)
 
 1. **Fine-tune `halong_embedding`** on 6,000 (query, ground-truth chunk) pairs extracted from `train.json` — all current components are zero-shot and have never trained on competition legal texts. This remains the highest-leverage opportunity.
 2. **Query-side abbreviation dictionary** — low-cost, verifiable within 10 minutes.
 3. **Word segmentation + bigrams for BM25** — Vietnamese multi-syllable compound words (e.g., 'mức lương cơ sở') are currently split into loose unigrams.
 4. **Re-enable cross-encoder** with `ndocs=50`.
+
+---
+
+# Task 2: Legal Question Answering (LegalQA)
+
+Vietnamese Long-Form Legal Question Answering System. Given a complex legal question, retrieve relevant legal statutes and generate an accurate, coherent answer grounded in official legislation with explicit legal citations.
+
+**Evaluation Metrics: METEOR (Primary) & ROUGE-L (Secondary)**  
+**Runtime Constraint: Total Parameters < 4B (Offline Kaggle T4)**
+
+---
+
+## Pipeline (Task 2)
+
+```
+Legal Query (median 19 words)
+        │
+        ▼  BM25 / Hybrid retrieval on 256-word chunks
+Top-k Chunks (R@1: 55.4%, R@10: 89.7%, R@100: 97.8%)
+        │
+        ▼  "Small-to-Big" Evidence Expansion
+Full Legal Article (`Điều`) containing the matched chunk
+        │
+        ▼  Citation-Gated Legal Graph Traversal
+Referenced Statutes & Decrees (expanded ONLY if explicitly cited)
+        │
+        ▼  Context Assembly & Legal Grounding
+System Prompt + Hierarchical Evidence (Doc > Article > Clause) + Query
+        │
+        ▼  Generator (< 4B Parameters, FP16 / 4-bit)
+Ground-Truth Grounded Legal Answer with Legal Citations
+```
+
+| Pipeline Iteration | Indexing Unit | Recall@1 | Recall@10 | Recall@100 | Primary Failure Mode |
+|---|---|---|---|---|---|
+| **v9.2 (Legacy)** | Full Document | 22.3% | 50.9% | 76.3% | Severe BM25 length dilution (median 4,828 words/doc vs 19 words/query) |
+| **v10 (Current)** | **256-word Chunk** | **55.4%** | **89.7%** | **97.8%** | Evidence context overflow handled by Article-level expansion |
+
+### 1. "Small-to-Big" Retrieval & Evidence Expansion
+
+Full legal documents average 4,828 words and can reach over 1.24 million words, drastically diluting keyword match signals against concise user queries.
+
+- **Retrieval Unit (Small)**: Indexing operates on fine-grained **256-word chunks**, dramatically sharpening retrieval focus and boosting **Recall@1 from 22.3% to 55.4%** and **Recall@10 from 50.9% to 89.7%**.
+- **Generation Unit (Big)**: Passing isolated 256-word fragments into the generator truncates statutory context and omits essential legal clauses. Once a chunk is retrieved, the system dynamically expands it to its **full parent Article (`Điều`)**, providing the LLM with complete, legally coherent evidence.
+
+### 2. HTML Text Normalization & Article Recovery
+
+Raw legal documents crawled from HTML contain substantial formatting corruption, especially soft line breaks (`\r\n\n`) within legislative headings:
+
+- In raw data, **62.3% of Article titles were split mid-sentence**, causing regex parsers and segmenters to fail.
+- Targeted text normalization and regex repairing reduced title fragmentation from **62.3% down to 0.2%**, ensuring clean article boundaries and reliable citation extraction.
+
+### 3. Citation-Gated Legal Graph Traversal
+
+Previous versions (v9.2) experimented with complex graph traversals with relation count gates, which failed because **93.1% of legal documents contain boilerplate "căn cứ" (pursuant to) phrases**, flooding the graph with noisy edges.
+
+- v10 replaces noisy heuristics with **citation-gated expansion**: the graph traverses an edge *only* when the retrieved evidence explicitly cites a specific decree, law, or circular by official code/title.
+- Redundant components like multi-candidate selectors, agentic tool-calling loops, and train-memory were eliminated in favor of deterministic evidence assembly, drastically cutting latency and preventing hallucinated citations.
+
+### 4. Generation Under Parameter Budget (< 4B)
+
+To meet the strict competition constraint of **offline execution on Kaggle T4 with < 4B total runtime parameters**:
+
+- **Model Budget**: Employs an instruction-tuned LLM (< 4B parameters, e.g., Qwen2.5 / Gemma2 series) running in FP16 or 4-bit quantization.
+- **Hierarchical Prompt Construction**: Evidence is structured strictly as `Văn bản > Điều > Khoản` to encourage verbatim quoting of legal clauses, directly maximizing n-gram precision and recall for **METEOR** and **ROUGE-L**.
+- **Constrained Decoding**: Low-temperature sampling with repetition penalties suppresses conversational filler and enforces concise, formal legal Vietnamese.
+
+---
+
+## Data Insights & Findings (Task 2)
+
+| Insight | Metric / Observation | Architectural Decision |
+|---|---|---|
+| Document Length Variance | Median 4,828 words/doc vs 19 words/query | Mandatory 256-word chunking for retrieval |
+| Raw Crawl Soft Wraps | `\r\n\n` split 62.3% of Article headers | Pre-chunk regex normalization (< 0.2% errors) |
+| Boilerplate Legal Phrases | 93.1% of documents contain "căn cứ" | Prune relation-count graphs; use strict citation gating |
+| Agentic Loops on T4 | Excessive inference latency & memory overhead | Switch to deterministic small-to-big RAG pipeline |
+
+---
+
+## Empirical Insights & Architectural Lessons (Task 2)
+
+1. **Retrieval Quality Caps Generation Ceiling**: In long-form LegalQA, generator hallucination is primarily driven by retrieval misses. Raising Recall@100 from 76.3% to 97.8% eliminated the vast majority of unsupported answers.
+2. **Simplicity Over Agentic Complexity**: Multi-turn agentic tool calling and memory layers underperformed a well-tuned single-turn Small-to-Big RAG pipeline, while consuming 4× the inference time on resource-constrained Kaggle T4 GPUs.
+3. **METEOR Metric Sensitivity**: METEOR rewards exact stem and synonym alignment. Preserving original legal phrasing rather than conversational paraphrasing yields consistently higher evaluation scores.
+
+---
+
+## Next Steps / Future Work (Task 2)
+
+1. **Supervised Fine-Tuning (SFT) / QLoRA**: Fine-tune the < 4B generator directly on legal question-evidence-answer triplets extracted from training splits.
+2. **DPO / KTO Alignment**: Align response style to match official competition ground truth answers (structured legal rationale followed by explicit conclusion).
+3. **Dynamic Context Packing**: Implement token-aware packing to fit multi-article cross-references within the model's active context window without KV cache eviction.
