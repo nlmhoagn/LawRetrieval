@@ -1,0 +1,13 @@
+# DSC 2026 - Task 1: LegalIR
+
+numpy>=1.24
+torch>=2.0
+transformers>=4.40
+
+# torch: cai ban CUDA neu co GPU (buoc trich vector nhanh hon rat nhieu):
+#   pip install torch --index-url https://download.pytorch.org/whl/cu124
+# Khong co GPU van chay duoc, chi la buoc encode se rat lau.
+
+# --- Tuy chon: chi can khi bat cross-encoder rerank (rerank.py) ---
+# sentencepiece
+# protobuf

@@ -1,0 +1,62 @@
+# ---- Du lieu cua BTC (khong phat tan lai) -------------------------------
+LegalIR - Public Test*/
+*.zip
+!Retrieval-LegalIR/submission*.zip
+
+# ---- San pham trung gian: deu tai tao duoc, tong ~1.7 GB ----------------
+# chunks.jsonl        592 MB  <- chunker.py,  1m31s
+# emb/emb_768.f16     714 MB  <- encode.py,   36 phut
+# index/postings.i32  185 MB  <- bm25.py,     202s
+# index/tfs.u16        93 MB
+# data/pairs.jsonl     49 MB  <- mine_data.py, 9 phut
+Chunking-LegalIR/chunks*.jsonl
+Retrieval-LegalIR/index*/
+Retrieval-LegalIR/emb*/
+Finetune-LegalIR/data/pairs.jsonl
+Finetune-LegalIR/models/
+Mock-Eval-LegalIR/mock*/
+
+# ---- Ket qua chay -------------------------------------------------------
+Retrieval-LegalIR/submission*.json
+*.out
+*.log
+*.err
+
+# ---- Ung vien / diem trung gian cua thi nghiem (~15 MB, tai tao duoc) ---
+# Ngoai chuyen nang, pairs_*.json va *.gold.json con chua cau hoi + dap an gold
+# lay tu train.json cua BTC -> khong dua len repo.
+Retrieval-LegalIR/pairs_*.json
+Retrieval-LegalIR/sc_*.json
+Retrieval-LegalIR/cands_*.json
+Retrieval-LegalIR/pool_*.npz
+Retrieval-LegalIR/pool_*.npz.gold.json
+
+# ---- Python -------------------------------------------------------------
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.ipynb_checkpoints/
+
+# ---- Rac he dieu hanh / IDE --------------------------------------------
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+2_35AM
+
+# rac cua trinh nen macOS trong bundle BTC
+__MACOSX/
+
+# ---- Ngoai pham vi repo (van con tren dia) -----------------------------
+Scoring-Program-Task-LegalIR/
+Mock-Eval-LegalIR/
+EDA-LegalIR/
+
+# ---- Finetune: giu code, bo du lieu va model ---------------------------
+# Truoc day chan ca thu muc Finetune-LegalIR/, nhung nhu vay chan luon 5 file
+# .py ma RUNNING.md muc 6 huong dan dung. Gio chi chan phan nang.
+Finetune-LegalIR/data*/
+Finetune-LegalIR/models*/
+Finetune-LegalIR/logs*/
+_THUA_THAI_CAN_XOA/
